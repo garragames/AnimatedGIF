@@ -42,48 +42,100 @@ void my_handler(int signal)
 //
 void ShowFrame(int bFullscreen)
 {
-uint32_t ulPixel=0, *pul;
-uint8_t *s, *pPal;
-int pixel, x, y;
+    // Check for 32-bit or 16-bit display
+    if (vinfo.bits_per_pixel == 32) {
+        uint32_t ulPixel = 0, *pul;
+        uint8_t *s, *pPal;
+        int pixel, x, y;
 
-	if (bFullscreen) { // stretch to fit
-	int iFracX, iFracY; // x/y stretch fractions
-	int newpixel, iAccumX, iAccumY;
-	iFracX = (iGIFWidth * 256) / iScreenWidth;
-	iFracY = (iGIFHeight * 256) / iScreenHeight;
-	iAccumY = 0;
-	for (y=0; y<iScreenHeight; y++) {
-		pul = (uint32_t *)&fbp[iPitch * y];
-		s = &pGIFBuf[(iAccumY>>8) * iGIFWidth];
-		iAccumY += iFracY;
-		iAccumX = 0;
-		pixel = -1;
-		for (x=0; x<iScreenWidth; x++) {
-			newpixel = s[(iAccumX >> 8)];
-			if (newpixel != pixel) {
-				pixel = newpixel;
-				pPal = (uint8_t *)&gif.pPalette;
-				pPal += pixel * 3;
-				ulPixel = 0xff000000 | (pPal[0] << 16) | (pPal[1] << 8) | pPal[2];
-			}
-			*pul++ = ulPixel;
-			iAccumX += iFracX;
-		}
-	} // for y
+        if (bFullscreen) { // stretch to fit
+            int iFracX, iFracY; // x/y stretch fractions
+            int newpixel, iAccumX, iAccumY;
+            iFracX = (iGIFWidth * 256) / iScreenWidth;
+            iFracY = (iGIFHeight * 256) / iScreenHeight;
+            iAccumY = 0;
+            for (y = 0; y < iScreenHeight; y++) {
+                pul = (uint32_t *)&fbp[iPitch * y];
+                s = &pGIFBuf[(iAccumY >> 8) * iGIFWidth];
+                iAccumY += iFracY;
+                iAccumX = 0;
+                pixel = -1;
+                for (x = 0; x < iScreenWidth; x++) {
+                    newpixel = s[(iAccumX >> 8)];
+                    if (newpixel != pixel) {
+                        pixel = newpixel;
+                        pPal = (uint8_t *)&gif.pPalette;
+                        pPal += pixel * 3;
+                        ulPixel = (pPal[0] << 16) | (pPal[1] << 8) | pPal[2];
+                    }
+                    *pul++ = ulPixel;
+                    iAccumX += iFracX;
+                }
+            } // for y
         } else { // draw 1:1
-	for (y=0; y<iGIFHeight; y++) {
-		pul = (uint32_t *)&fbp[iPitch * y];
-		s = &pGIFBuf[y * iGIFWidth];
-		for (x=0; x<iGIFWidth; x++) {
-			pixel = *s++;
-			pPal = (uint8_t *)&gif.pPalette;
-			pPal += pixel * 3;
-			ulPixel = 0xff000000 | (pPal[0] << 16) | (pPal[1] << 8) | pPal[2];
-			*pul++ = ulPixel;
-		}
-	} // for y
-	} // 1:1
+            for (y = 0; y < iGIFHeight; y++) {
+                pul = (uint32_t *)&fbp[iPitch * y];
+                s = &pGIFBuf[y * iGIFWidth];
+                for (x = 0; x < iGIFWidth; x++) {
+                    pixel = *s++;
+                    pPal = (uint8_t *)&gif.pPalette;
+                    pPal += pixel * 3;
+                    ulPixel = (pPal[0] << 16) | (pPal[1] << 8) | pPal[2];
+                    *pul++ = ulPixel;
+                }
+            } // for y
+        } // 1:1
+    } else if (vinfo.bits_per_pixel == 16) {
+        uint16_t usPixel = 0, *pus;
+        uint8_t *s, *pPal, r, g, b;
+        int pixel, x, y;
+
+        if (bFullscreen) { // stretch to fit
+            int iFracX, iFracY; // x/y stretch fractions
+            int newpixel, iAccumX, iAccumY;
+            iFracX = (iGIFWidth * 256) / iScreenWidth;
+            iFracY = (iGIFHeight * 256) / iScreenHeight;
+            iAccumY = 0;
+            for (y = 0; y < iScreenHeight; y++) {
+                pus = (uint16_t *)&fbp[iPitch * y];
+                s = &pGIFBuf[(iAccumY >> 8) * iGIFWidth];
+                iAccumY += iFracY;
+                iAccumX = 0;
+                pixel = -1;
+                for (x = 0; x < iScreenWidth; x++) {
+                    newpixel = s[(iAccumX >> 8)];
+                    if (newpixel != pixel) {
+                        pixel = newpixel;
+                        pPal = (uint8_t *)&gif.pPalette;
+                        pPal += pixel * 3;
+                        r = pPal[0] >> 3; // 8-bit to 5-bit
+                        g = pPal[1] >> 2; // 8-bit to 6-bit
+                        b = pPal[2] >> 3; // 8-bit to 5-bit
+                        usPixel = (r << 11) | (g << 5) | b;
+                    }
+                    *pus++ = usPixel;
+                    iAccumX += iFracX;
+                }
+            } // for y
+        } else { // draw 1:1
+            for (y = 0; y < iGIFHeight; y++) {
+                pus = (uint16_t *)&fbp[iPitch * y];
+                s = &pGIFBuf[y * iGIFWidth];
+                for (x = 0; x < iGIFWidth; x++) {
+                    pixel = *s++;
+                    pPal = (uint8_t *)&gif.pPalette;
+                    pPal += pixel * 3;
+                    r = pPal[0] >> 3; // 8-bit to 5-bit
+                    g = pPal[1] >> 2; // 8-bit to 6-bit
+                    b = pPal[2] >> 3; // 8-bit to 5-bit
+                    usPixel = (r << 11) | (g << 5) | b;
+                    *pus++ = usPixel;
+                }
+            } // for y
+        } // 1:1
+    }
 } /* ShowFrame() */
+
 //
 // Callback from GIF library for each line decoded
 //
@@ -123,25 +175,61 @@ int x, y;
       memcpy(d, s, pDraw->iWidth);
     }
 } /* GIFDraw() */
-
+void print_usage(void)
+{
+    printf("Usage: fb_demo [--loop N] [filename]\n");
+    printf("Run with no parameters to test in-memory decoding\n");
+    printf("Or pass a filename on the command line\n");
+    printf("Optional parameter: --loop N, loop N iterations (default: infinite)\n");
+}
 int main(int argc, const char * argv[]) {
-int screensize, fbfd = 0, rc;
-struct sigaction sigIntHandler;
+    int screensize, fbfd = 0, rc;
+    struct sigaction sigIntHandler;
+    char *szInFile = NULL;
+    int iLoopCount = -1;
 
-// Set CTRL-C signal handler
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--loop") == 0) {
+            if (i + 1 < argc) {
+                iLoopCount = atoi(argv[++i]);
+            } else {
+                printf("Error: --loop requires a number.\n");
+                print_usage();
+                return -1;
+            }
+        } else if (argv[i][0] == '-') {
+            printf("Error: Unknown option '%s'\n", argv[i]);
+            print_usage();
+            return -1;
+        } else {
+            if (szInFile) {
+                printf("Error: Multiple filenames specified: '%s' and '%s'\n", szInFile, argv[i]);
+                print_usage();
+                return -1;
+            }
+            szInFile = (char *)argv[i];
+        }
+    }
+
+    // Set CTRL-C signal handler
     sigIntHandler.sa_handler = my_handler;
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);
 
     printf("Animated GIF Linux Demo\n");
+    if (iLoopCount >= 0)
+        printf("Loop count: %d\n", iLoopCount);
+    else
+        printf("Loop count: infinite\n");
     printf("Run with no parameters to test in-memory decoding\n");
     printf("Or pass a filename on the command line\n\n");
+
     // Access the framebuffer
-    fbfd = open("/dev/fb0", O_RDWR);
+    fbfd = open("/dev/fb1", O_RDWR);
     if (!fbfd) {
-	printf("Error opening framebuffer device; try disabling the VC4 overlay\n");
-	return -1;
+        printf("Error opening framebuffer device; try disabling the VC4 overlay\n");
+        return -1;
     }
     // Get the fixed screen information
     if (ioctl(fbfd, FBIOGET_FSCREENINFO, &finfo)) {
@@ -163,7 +251,8 @@ struct sigaction sigIntHandler;
     screensize = finfo.smem_len;
     fbp = (uint8_t*)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
 
-    if ((int)fbp == -1) {
+    // FIX 2: Correct way to check for mmap failure
+    if (fbp == MAP_FAILED) {
        printf("Failed to mmap the framebuffer.\n");
        close(fbfd);
        return -1;
@@ -171,27 +260,49 @@ struct sigaction sigIntHandler;
 
     GIF_begin(&gif, BIG_ENDIAN_PIXELS);
     printf("Starting GIF decoder...\n");
-    if (argc == 2) // use filename
-        rc = GIF_openFile(&gif, argv[1], GIFDraw);
+    if (szInFile)
+        rc = GIF_openFile(&gif, szInFile, GIFDraw);
     else
-        rc = GIF_openRAM(&gif, (uint8_t *)ucBadgers, sizeof(ucBadgers), GIFDraw);
+        rc = GIF_openRAM(&gif, (uint8_t *)badgers, sizeof(badgers), GIFDraw);
     if (rc)
     {
         printf("Successfully opened GIF\n");
-	iGIFWidth = GIF_getCanvasWidth(&gif);
-	iGIFHeight = GIF_getCanvasHeight(&gif);
+        iGIFWidth = GIF_getCanvasWidth(&gif);
+        iGIFHeight = GIF_getCanvasHeight(&gif);
         printf("Image size: %d x %d\n", iGIFWidth, iGIFHeight);
-	gif.ucDrawType = GIF_DRAW_RAW; // we want the original 8-bit pixels
-	gif.ucPaletteType = GIF_PALETTE_RGB888;
-	// Allocate a buffer to hold the current GIF frame
-	pGIFBuf = malloc(iGIFWidth * iGIFHeight);
-        while (!iStop) {
-	    int iDelay;
-	    while (GIF_playFrame(&gif, &iDelay, NULL)) {
-		    ShowFrame(1);
-		    // usleep(iDelay * 1000);
+        gif.ucDrawType = GIF_DRAW_RAW; // we want the original 8-bit pixels
+        gif.ucPaletteType = GIF_PALETTE_RGB888;
+        // Allocate a buffer to hold the current GIF frame
+        pGIFBuf = malloc(iGIFWidth * iGIFHeight);
+        if (!pGIFBuf) {
+            printf("Failed to allocate memory for GIF buffer\n");
+            GIF_close(&gif);
+            munmap(fbp, screensize);
+            close(fbfd);
+            return -1;
+        }
+        {
+            int iDelay;
+            if (iLoopCount < 0) {
+                while (!iStop) {
+                    while (GIF_playFrame(&gif, &iDelay, NULL)) {
+                        if (iStop) break;
+                        ShowFrame(1);
+                        usleep(iDelay * 1000);
+                    }
+                    GIF_reset(&gif);
+                }
+            } else {
+                for (int i = 0; i < iLoopCount && !iStop; i++) {
+                    while (GIF_playFrame(&gif, &iDelay, NULL)) {
+                        if (iStop) break;
+                        ShowFrame(1);
+                        usleep(iDelay * 1000);
+                    }
+                    GIF_reset(&gif);
+                }
             }
-	} // waiting for CTRL-C
+        }
         GIF_close(&gif);
     }
     // Cleanup
